@@ -174,7 +174,7 @@ class XmlDriver extends AbstractFileDriver
                         }
 
                         if (isset($colConfig->attributes()->namespace)) {
-                            $pMetadata->xmlNamespace = (string) $colConfig->attributes()->namespace;
+                            $pMetadata->xmlEntryNamespace = (string) $colConfig->attributes()->namespace;
                         }
                     }
 
@@ -190,12 +190,12 @@ class XmlDriver extends AbstractFileDriver
                             $pMetadata->xmlEntryName = (string) $colConfig->attributes()->{'entry-name'};
                         }
 
-                        if (isset($colConfig->attributes()->{'key-attribute-name'})) {
-                            $pMetadata->xmlKeyAttribute = (string) $colConfig->attributes()->{'key-attribute-name'};
+                        if (isset($colConfig->attributes()->namespace)) {
+                            $pMetadata->xmlEntryNamespace = (string) $colConfig->attributes()->namespace;
                         }
 
-                        if (isset($colConfig->attributes()->namespace)) {
-                            $pMetadata->xmlNamespace = (string) $colConfig->attributes()->namespace;
+                        if (isset($colConfig->attributes()->{'key-attribute-name'})) {
+                            $pMetadata->xmlKeyAttribute = (string) $colConfig->attributes()->{'key-attribute-name'};
                         }
                     }
 

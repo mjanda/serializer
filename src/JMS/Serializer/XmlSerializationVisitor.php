@@ -42,6 +42,13 @@ class XmlSerializationVisitor extends AbstractVisitor
     private $currentMetadata;
     private $hasValue;
     private $nullWasVisited;
+    private $objectMetadataStack;
+
+    public function __construct($namingStrategy)
+    {
+        parent::__construct($namingStrategy);
+        $this->objectMetadataStack = new \SplStack;
+    }
 
     public function setDefaultRootName($name, $namespace = null)
     {
@@ -161,18 +168,25 @@ class XmlSerializationVisitor extends AbstractVisitor
 
         $entryName = (null !== $this->currentMetadata && null !== $this->currentMetadata->xmlEntryName) ? $this->currentMetadata->xmlEntryName : 'entry';
         $keyAttributeName = (null !== $this->currentMetadata && null !== $this->currentMetadata->xmlKeyAttribute) ? $this->currentMetadata->xmlKeyAttribute : null;
-        $namespace =  (null !== $this->currentMetadata && null !== $this->currentMetadata->xmlNamespace) ? $this->currentMetadata->xmlNamespace : null;
+        $namespace = (null !== $this->currentMetadata && null !== $this->currentMetadata->xmlEntryNamespace) ? $this->currentMetadata->xmlEntryNamespace : null;
 
         foreach ($data as $k => $v) {
             $tagName = (null !== $this->currentMetadata && $this->currentMetadata->xmlKeyValuePairs && $this->isElementNameValid($k)) ? $k : $entryName;
 
             if (!is_null($namespace)) {
-                if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                    $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+
+                if ($namespace === "" || $this->currentNode->isDefaultNamespace($namespace)) {
+
+                    $entryNode = $this->document->createElementNS($namespace, $tagName);
+                } else {
+                    if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
+                        $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+                    }
+
+                    $entryNode = $this->document->createElementNS($namespace, $prefix . ':' . $tagName);
                 }
 
-                $entryNode = $this->document->createElementNS($this->currentMetadata->xmlNamespace, $tagName);
-                $entryNode->prefix = $prefix;
+
             } else {
                 $entryNode = $this->document->createElement($tagName);
             }
@@ -194,23 +208,25 @@ class XmlSerializationVisitor extends AbstractVisitor
 
     public function startVisitingObject(ClassMetadata $metadata, $data, array $type, Context $context)
     {
+        $this->objectMetadataStack->push($metadata);
         if (null === $this->document) {
             $this->document = $this->createDocument(null, null, false);
             if ($metadata->xmlRootName) {
                 $rootName = $metadata->xmlRootName;
-                $rootNamespace = $metadata->xmlRootNamespace;
+                $rootNamespace = $metadata->xmlRootNamespace?:(isset($metadata->xmlNamespaces[''])?$metadata->xmlNamespaces['']:null);
             } else {
                 $rootName = $this->defaultRootName;
                 $rootNamespace = $this->defaultRootNamespace;
             }
-            if ($rootNamespace) {
+
+            if (null !== $rootNamespace) {
                 $this->currentNode = $this->document->createElementNS($rootNamespace, $rootName);
             } else {
                 $this->currentNode = $this->document->createElement($rootName);
             }
             $this->document->appendChild($this->currentNode);
         }
-        
+
         $this->addNamespaceAttributes($metadata, $this->currentNode);
 
         $this->hasValue = false;
@@ -230,7 +246,7 @@ class XmlSerializationVisitor extends AbstractVisitor
             $this->revertCurrentMetadata();
 
             if (!$node instanceof \DOMCharacterData) {
-                throw new RuntimeException(sprintf('Unsupported value for XML attribute. Expected character data, but got %s.', json_encode($v)));
+                throw new RuntimeException(sprintf('Unsupported value for XML attribute for %s. Expected character data, but got %s.', $metadata->name, json_encode($v)));
             }
             $attributeName = $this->namingStrategy->translateName($metadata);
             if ('' !== $namespace = (string) $metadata->xmlNamespace) {
@@ -295,13 +311,32 @@ class XmlSerializationVisitor extends AbstractVisitor
 
         if ($addEnclosingElement = (!$metadata->xmlCollection || !$metadata->xmlCollectionInline) && !$metadata->inline) {
             $elementName = $this->namingStrategy->translateName($metadata);
-            if ('' !== $namespace = (string) $metadata->xmlNamespace) {
-                if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                    $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+
+            if (null !== $namespace = $metadata->xmlNamespace) {
+                if ($namespace === "" || $this->currentNode->isDefaultNamespace($namespace)) {
+                    $element = $this->document->createElementNS($namespace, $elementName);
+                } else {
+                    if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
+                        $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+                    }
+                    try {
+                        $element = $this->document->createElementNS($namespace, $prefix.':'.$elementName);
+                    } catch (\Exception $e) {
+                        var_dump($namespace);
+                        print_r($metadata);
+                        die($e);
+                    }
+
                 }
-                $element = $this->document->createElementNS($namespace, $prefix.':'.$elementName);
             } else {
-                $element = $this->document->createElement($elementName);
+                $classMetadata = $this->objectMetadataStack->top();
+                $defaultNamespace = isset($classMetadata->xmlNamespaces[''])?$classMetadata->xmlNamespaces['']:null;
+
+                if (null!==$defaultNamespace) {
+                    $element = $this->document->createElementNS($defaultNamespace, $elementName);
+                } else {
+                    $element = $this->document->createElement($elementName);
+                }
             }
             $this->setCurrentNode($element);
         }
@@ -328,6 +363,7 @@ class XmlSerializationVisitor extends AbstractVisitor
 
     public function endVisitingObject(ClassMetadata $metadata, $data, array $type, Context $context)
     {
+        $this->objectMetadataStack->pop();
     }
 
     public function getResult()
@@ -432,7 +468,7 @@ class XmlSerializationVisitor extends AbstractVisitor
             $this->nullWasVisited = true;
         }
     }
-    
+
     /**
      * Adds namespace attributes to the XML root element
      *
