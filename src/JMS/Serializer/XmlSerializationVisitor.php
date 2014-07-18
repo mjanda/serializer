@@ -197,7 +197,7 @@ class XmlSerializationVisitor extends AbstractVisitor
             $this->document = $this->createDocument(null, null, false);
             if ($metadata->xmlRootName) {
                 $rootName = $metadata->xmlRootName;
-                $rootNamespace = $metadata->xmlRootNamespace?:(isset($metadata->xmlNamespaces[''])?$metadata->xmlNamespaces['']:null);
+                $rootNamespace = $metadata->xmlRootNamespace?:$this->getClassDefaultNamespace($metadata);
             } else {
                 $rootName = $this->defaultRootName;
                 $rootNamespace = $this->defaultRootNamespace;
@@ -286,9 +286,7 @@ class XmlSerializationVisitor extends AbstractVisitor
             if (null !== $metadata->xmlNamespace) {
                 $element = $this->createElement($elementName, $metadata->xmlNamespace);
             } else {
-                $classMetadata = $this->objectMetadataStack->top();
-                $defaultNamespace = isset($classMetadata->xmlNamespaces[''])?$classMetadata->xmlNamespaces['']:null;
-
+                $defaultNamespace = $this->getClassDefaultNamespace($this->objectMetadataStack->top());
                 $element = $this->createElement($elementName, $defaultNamespace);
             }
             $this->setCurrentNode($element);
@@ -439,7 +437,7 @@ class XmlSerializationVisitor extends AbstractVisitor
         }
     }
 
-    protected function createElement($tagName, $namespace = null)
+    private function createElement($tagName, $namespace = null)
     {
         if (null !== $namespace) {
 
@@ -458,7 +456,7 @@ class XmlSerializationVisitor extends AbstractVisitor
         }
     }
 
-    protected function setAttributeOnNode(\DOMElement $node, $name, $value, $namespace = null)
+    private function setAttributeOnNode(\DOMElement $node, $name, $value, $namespace = null)
     {
         if (null !== $namespace) {
             if (!$prefix = $node->lookupPrefix($namespace)) {
@@ -469,4 +467,10 @@ class XmlSerializationVisitor extends AbstractVisitor
             $node->setAttribute($name, $value);
         }
     }
+
+    private function getClassDefaultNamespace(ClassMetadata $metadata)
+    {
+        return (isset($metadata->xmlNamespaces[''])?$metadata->xmlNamespaces['']:null);
+    }
+
 }
