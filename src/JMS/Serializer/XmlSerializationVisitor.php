@@ -283,7 +283,7 @@ class XmlSerializationVisitor extends AbstractVisitor
         if ($addEnclosingElement = (!$metadata->xmlCollection || !$metadata->xmlCollectionInline) && !$metadata->inline) {
             $elementName = $this->namingStrategy->translateName($metadata);
 
-            if ('' !== $namespace = (string) $metadata->xmlNamespace) {
+            if (null !== $metadata->xmlNamespace) {
                 $element = $this->createElement($elementName, $metadata->xmlNamespace);
             } else {
                 $classMetadata = $this->objectMetadataStack->top();
