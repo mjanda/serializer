@@ -173,24 +173,7 @@ class XmlSerializationVisitor extends AbstractVisitor
         foreach ($data as $k => $v) {
             $tagName = (null !== $this->currentMetadata && $this->currentMetadata->xmlKeyValuePairs && $this->isElementNameValid($k)) ? $k : $entryName;
 
-            if (!is_null($namespace)) {
-
-                if ($namespace === "" || $this->currentNode->isDefaultNamespace($namespace)) {
-
-                    $entryNode = $this->document->createElementNS($namespace, $tagName);
-                } else {
-                    if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                        $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
-                    }
-
-                    $entryNode = $this->document->createElementNS($namespace, $prefix . ':' . $tagName);
-                }
-
-
-            } else {
-                $entryNode = $this->document->createElement($tagName);
-            }
-
+            $entryNode = $this->createElement($tagName, $namespace);
             $this->currentNode->appendChild($entryNode);
             $this->setCurrentNode($entryNode);
 
@@ -209,6 +192,7 @@ class XmlSerializationVisitor extends AbstractVisitor
     public function startVisitingObject(ClassMetadata $metadata, $data, array $type, Context $context)
     {
         $this->objectMetadataStack->push($metadata);
+
         if (null === $this->document) {
             $this->document = $this->createDocument(null, null, false);
             if ($metadata->xmlRootName) {
@@ -219,11 +203,12 @@ class XmlSerializationVisitor extends AbstractVisitor
                 $rootNamespace = $this->defaultRootNamespace;
             }
 
-            if (null !== $rootNamespace) {
+            if ($rootNamespace) {
                 $this->currentNode = $this->document->createElementNS($rootNamespace, $rootName);
             } else {
                 $this->currentNode = $this->document->createElement($rootName);
             }
+
             $this->document->appendChild($this->currentNode);
         }
 
@@ -249,14 +234,7 @@ class XmlSerializationVisitor extends AbstractVisitor
                 throw new RuntimeException(sprintf('Unsupported value for XML attribute for %s. Expected character data, but got %s.', $metadata->name, json_encode($v)));
             }
             $attributeName = $this->namingStrategy->translateName($metadata);
-            if ('' !== $namespace = (string) $metadata->xmlNamespace) {
-                if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                    $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
-                }
-                $this->currentNode->setAttributeNS($namespace, $prefix.':'.$attributeName, $node->nodeValue);
-            } else {
-                $this->currentNode->setAttribute($attributeName, $node->nodeValue);
-            }
+            $this->setAttributeOnNode($this->currentNode, $attributeName, $node->nodeValue, $metadata->xmlNamespace);
 
             return;
         }
@@ -296,14 +274,7 @@ class XmlSerializationVisitor extends AbstractVisitor
                     throw new RuntimeException(sprintf('Unsupported value for a XML attribute map value. Expected character data, but got %s.', json_encode($v)));
                 }
 
-                if ('' !== $namespace = (string) $metadata->xmlNamespace) {
-                    if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                        $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
-                    }
-                    $this->currentNode->setAttributeNS($namespace, $prefix.':'.$key, $node->nodeValue);
-                } else {
-                    $this->currentNode->setAttribute($key, $node->nodeValue);
-                }
+                $this->setAttributeOnNode($this->currentNode, $key, $node->nodeValue, $metadata->xmlNamespace);
             }
 
             return;
@@ -312,31 +283,13 @@ class XmlSerializationVisitor extends AbstractVisitor
         if ($addEnclosingElement = (!$metadata->xmlCollection || !$metadata->xmlCollectionInline) && !$metadata->inline) {
             $elementName = $this->namingStrategy->translateName($metadata);
 
-            if (null !== $namespace = $metadata->xmlNamespace) {
-                if ($namespace === "" || $this->currentNode->isDefaultNamespace($namespace)) {
-                    $element = $this->document->createElementNS($namespace, $elementName);
-                } else {
-                    if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
-                        $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
-                    }
-                    try {
-                        $element = $this->document->createElementNS($namespace, $prefix.':'.$elementName);
-                    } catch (\Exception $e) {
-                        var_dump($namespace);
-                        print_r($metadata);
-                        die($e);
-                    }
-
-                }
+            if ('' !== $namespace = (string) $metadata->xmlNamespace) {
+                $element = $this->createElement($elementName, $metadata->xmlNamespace);
             } else {
                 $classMetadata = $this->objectMetadataStack->top();
                 $defaultNamespace = isset($classMetadata->xmlNamespaces[''])?$classMetadata->xmlNamespaces['']:null;
 
-                if (null!==$defaultNamespace) {
-                    $element = $this->document->createElementNS($defaultNamespace, $elementName);
-                } else {
-                    $element = $this->document->createElement($elementName);
-                }
+                $element = $this->createElement($elementName, $defaultNamespace);
             }
             $this->setCurrentNode($element);
         }
@@ -483,6 +436,37 @@ class XmlSerializationVisitor extends AbstractVisitor
                 $attribute .= ':'.$prefix;
             }
             $element->setAttributeNS('http://www.w3.org/2000/xmlns/', $attribute, $uri);
+        }
+    }
+
+    protected function createElement($tagName, $namespace = null)
+    {
+        if (null !== $namespace) {
+
+            if ($this->currentNode->isDefaultNamespace($namespace)) {
+                return $this->document->createElementNS($namespace, $tagName);
+            } else {
+                if (!$prefix = $this->currentNode->lookupPrefix($namespace)) {
+                    $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+                }
+                return $this->document->createElementNS($namespace, $prefix . ':' . $tagName);
+            }
+
+
+        } else {
+            return $this->document->createElement($tagName);
+        }
+    }
+
+    protected function setAttributeOnNode(\DOMElement $node, $name, $value, $namespace = null)
+    {
+        if (null !== $namespace) {
+            if (!$prefix = $node->lookupPrefix($namespace)) {
+                $prefix = 'ns-'.  substr(sha1($namespace), 0, 8);
+            }
+            $node->setAttributeNS($namespace, $prefix.':'.$name, $value);
+        } else {
+            $node->setAttribute($name, $value);
         }
     }
 }
