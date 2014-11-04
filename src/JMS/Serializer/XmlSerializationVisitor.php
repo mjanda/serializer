@@ -252,7 +252,7 @@ class XmlSerializationVisitor extends AbstractVisitor
 
             $this->setCurrentMetadata($metadata);
             $node = $this->navigator->accept($v, $metadata->type, $context);
-            
+
             $this->revertCurrentMetadata();
             if ($node !== null) {
                 if (!$node instanceof \DOMCharacterData) {
@@ -308,8 +308,7 @@ class XmlSerializationVisitor extends AbstractVisitor
         if ($addEnclosingElement) {
             $this->revertCurrentNode();
 
-            if ($element->hasChildNodes() || $element->hasAttributes()
-                || (isset($metadata->type['name']) && $metadata->type['name'] === 'array' && isset($metadata->type['params'][1]))) {
+            if ($element->hasChildNodes() || $element->hasAttributes() || ($node === null && $v !== null)) {
                 $this->currentNode->appendChild($element);
             }
         }
