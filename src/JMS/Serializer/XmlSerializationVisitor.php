@@ -109,6 +109,9 @@ class XmlSerializationVisitor extends AbstractVisitor
 
     public function visitString($data, array $type, Context $context)
     {
+        if (null === $data) {
+            return;
+        }
 
         if (null !== $this->currentMetadata) {
             $doCData = $this->currentMetadata->xmlElementCData;
@@ -249,13 +252,15 @@ class XmlSerializationVisitor extends AbstractVisitor
 
             $this->setCurrentMetadata($metadata);
             $node = $this->navigator->accept($v, $metadata->type, $context);
+            
             $this->revertCurrentMetadata();
+            if ($node !== null) {
+                if (!$node instanceof \DOMCharacterData) {
+                    throw new RuntimeException(sprintf('Unsupported value for property %s::$%s. Expected character data, but got %s.', $metadata->reflection->class, $metadata->reflection->name, is_object($node) ? get_class($node) : gettype($node)));
+                }
 
-            if (!$node instanceof \DOMCharacterData) {
-                throw new RuntimeException(sprintf('Unsupported value for property %s::$%s. Expected character data, but got %s.', $metadata->reflection->class, $metadata->reflection->name, is_object($node) ? get_class($node) : gettype($node)));
+                $this->currentNode->appendChild($node);
             }
-
-            $this->currentNode->appendChild($node);
 
             return;
         }
