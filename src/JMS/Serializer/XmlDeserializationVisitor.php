@@ -159,7 +159,7 @@ class XmlDeserializationVisitor extends AbstractVisitor
                 return $this->result = array();
             }
 
-            return array();
+            return null;
         }
 
         switch (count($type['params'])) {
