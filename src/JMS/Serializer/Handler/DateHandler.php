@@ -53,6 +53,13 @@ class DateHandler implements SubscribingHandlerInterface
                 );
             }
         }
+        
+        $methods[] = array(
+            'type' => 'DateInterval',
+            'direction' => GraphNavigator::DIRECTION_DESERIALIZATION,
+            'format' => 'xml',
+            'method' => 'deserializeDateIntervalXml',
+        );
 
         return $methods;
     }
@@ -82,7 +89,15 @@ class DateHandler implements SubscribingHandlerInterface
 
         return $visitor->visitString($iso8601DateIntervalString, $type, $context);
     }
-
+    
+    public function deserializeDateIntervalXml(XmlDeserializationVisitor $visitor, $data, array $type){
+        $attributes = $data->attributes('xsi', true);
+        if (isset($attributes['nil'][0]) && (string) $attributes['nil'][0] === 'true') {
+            return null;
+        }
+        return new \DateInterval((string)$data);
+    }
+    
     public function deserializeDateTimeFromXml(XmlDeserializationVisitor $visitor, $data, array $type)
     {
         $attributes = $data->attributes('xsi', true);
