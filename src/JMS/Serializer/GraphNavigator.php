@@ -141,7 +141,7 @@ final class GraphNavigator
                 if ($context instanceof SerializationContext) {
                     if (null !== $data) {
                         if ($context->isVisiting($data)) {
-                            return null;
+                            //return null;
                         }
                         $context->startVisiting($data);
                     }
